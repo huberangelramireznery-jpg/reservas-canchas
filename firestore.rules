@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logueado() { return request.auth != null; }
+    function miFicha() {
+      return logueado()
+        && exists(/databases/$(database)/documents/Usuario/$(request.auth.uid))
+        && get(/databases/$(database)/documents/Usuario/$(request.auth.uid)).data.Estado == 'aprobado';
+    }
+    function miRol() {
+      return get(/databases/$(database)/documents/Usuario/$(request.auth.uid)).data.RolUsuario;
+    }
+    function esAdmin() { return miFicha() && miRol() in ['admin', 'administrador', 'dueno']; }
+    function esStaff() { return miFicha() && miRol() in ['admin', 'administrador', 'dueno', 'encargado']; }
+    function esMiDoc(uid) { return logueado() && request.auth.uid == uid; }
+
+    // Usuarios: registro libre en pendiente (incluye cliente, que el admin aprueba)
+    match /Usuario/{uid} {
+      allow create: if esMiDoc(uid)
+        && request.resource.data.Estado == 'pendiente'
+        && request.resource.data.RolUsuario in ['admin', 'administrador', 'dueno', 'encargado', 'cliente']
+        && request.resource.data.CorreoUsuario is string;
+      allow get: if esMiDoc(uid) || esAdmin();
+      allow list: if esAdmin();
+      allow update: if esAdmin();
+      allow delete: if esAdmin();
+    }
+
+    // Catálogo público: cualquiera ve canchas y horarios
+    match /Cancha/{doc} {
+      allow read: if true;
+      allow create, update: if miFicha();
+      allow delete: if esAdmin();
+    }
+    match /Horario/{doc} {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+
+    // Reservas de clientes sin cuenta: crear libre con datos mínimos
+    match /Cliente/{doc} {
+      allow create: if request.resource.data.keys().hasAll(['NombreCliente', 'TelefonoCliente']);
+      allow read: if miFicha();
+      allow update, delete: if esAdmin();
+    }
+    match /Reserva/{doc} {
+      allow create: if request.resource.data.keys().hasAll(['IdCancha', 'FechaReserva', 'HoraInicio', 'HoraFin', 'TotalReserva', 'EstadoReserva', 'IdCliente']);
+      allow read: if true;
+      allow update: if esStaff();
+      allow delete: if esAdmin();
+    }
+    // Pago QR: el cliente registra su pago pendiente
+    match /Pago/{doc} {
+      allow create: if request.resource.data.keys().hasAll(['IdReserva', 'MontoPago', 'MetodoPago', 'EstadoPago']);
+      allow read: if miFicha();
+      allow update: if esStaff();
+      allow delete: if esAdmin();
+    }
+    // Reportes de ingresos (foto de un momento)
+    match /Reporte/{doc} {
+      allow read: if miFicha();
+      allow create: if esStaff();
+      allow update, delete: if esAdmin();
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

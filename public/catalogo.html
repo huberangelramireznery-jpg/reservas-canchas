@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reserva tu Cancha ⚽</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="importmap">{ "imports": {
+"firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+"firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+} }</script>
+<style>input[type="text"],input:not([type]),textarea{text-transform:uppercase}</style>
+</head>
+<body class="font-sans antialiased text-stone-800 bg-stone-50">
+<header class="bg-white border-b-2 sticky top-0 z-30" style="border-color:#86efac">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 py-3">
+<div>
+<h2 class="font-black text-2xl leading-tight flex items-center gap-2" style="color:#14532d"><span class="text-3xl">⚽</span><span>Reserva tu Cancha</span></h2>
+<p class="text-xs font-semibold hidden sm:block" style="color:#15803d">Sin cuenta: elige hora, deja tus datos y paga con QR.</p>
+</div>
+<div class="flex items-center gap-2">
+<a id="btnShare" href="#" target="_blank" style="background-color:#25d366" class="px-3 py-2 rounded-2xl text-xs font-black text-white shadow-md">📲 <span class="hidden sm:inline">Compartir</span></a>
+</div>
+</div>
+</header>
+<div class="min-h-screen py-6" style="background:linear-gradient(180deg,#f0fdf4 0%,#ecfdf5 40%,#f7fef9 100%)">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+<div class="rounded-3xl p-5 sm:p-8 text-white shadow-lg relative overflow-hidden" style="background:linear-gradient(135deg,#14532d 0%,#15803d 50%,#22c55e 100%);border:2px solid #86efac">
+<div class="relative z-10 max-w-xl">
+<span class="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider" style="background-color:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4)">Deporte en Trinidad</span>
+<h3 class="text-xl sm:text-2xl font-black mt-3">¡Tu cancha lista en 1 minuto!</h3>
+<p class="text-green-100 text-xs sm:text-sm font-semibold mt-1.5">Sin cuenta: elige hora, deja tus datos y paga con QR.</p>
+</div>
+<div class="absolute -right-4 -bottom-6 text-7xl opacity-20 select-none">⚽</div>
+</div>
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-lg" style="color:#14532d">1️⃣ Elige fecha</h3>
+<input id="fFecha" type="date" class="mt-2 p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac">
+</div>
+<div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+<div id="boxRes" style="display:none" class="space-y-6">
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">2️⃣ Elige tu hora — <span id="rCancha"></span> (<span id="rFecha"></span>)</h3>
+<p class="text-xs font-semibold mt-1" style="color:#15803d">Verde = libre · Gris = ocupado</p>
+<div id="slots" class="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-4"></div>
+</div>
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">3️⃣ Tus datos</h3>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+<input id="cNom" placeholder="Nombre completo" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+<input id="cTel" placeholder="Celular / WhatsApp" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+</div>
+<div class="mt-4 p-3 rounded-xl flex justify-between items-center" style="background-color:#f0fdf4;border:1px dashed #86efac">
+<span class="text-sm font-black" style="color:#14532d">Total (<span id="rHoras">0</span> hora(s)):</span>
+<span id="rTotal" class="text-xl font-black" style="color:#15803d">Bs. 0.00</span>
+</div>
+<button id="btnReservar" class="mt-3 w-full py-3.5 rounded-2xl text-white font-black shadow-lg" style="background-color:#15803d">💳 Confirmar y Pagar con QR</button>
+</div>
+</div>
+</div>
+</div>
+<div id="modalPay" style="display:none" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+<div class="max-w-md w-full bg-white p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5" style="border:3px solid #86efac">
+<div><span class="text-4xl">🎉</span>
+<h1 class="text-2xl font-black mt-2" style="color:#14532d">¡Reserva Registrada!</h1>
+<p class="text-xs font-bold text-stone-500 mt-1">Escanea el QR desde tu app bancaria</p></div>
+<div class="p-4 rounded-2xl text-left space-y-1.5" style="background-color:#f0fdf4;border:1.5px solid #86efac">
+<p id="payNum" class="text-[10px] font-black uppercase text-stone-400"></p>
+<p id="payDet" class="font-black text-base" style="color:#14532d"></p>
+<div class="pt-2 border-t mt-2 flex justify-between items-center" style="border-color:#86efac">
+<span class="font-black text-sm" style="color:#14532d">Total a Pagar:</span>
+<span id="payTotal" class="text-2xl font-black" style="color:#15803d"></span>
+</div>
+</div>
+<div class="p-3 bg-white rounded-2xl shadow-md border-2 mx-auto w-fit" style="border-color:#86efac">
+<img src="imagenes/mi-qr.png" alt="QR de pago" class="w-56 h-56 object-contain rounded-xl">
+</div>
+<p class="text-xs font-semibold text-stone-600">Luego presiona abajo para enviarnos tu comprobante.</p>
+<a id="payWa" href="#" target="_blank" class="w-full py-3.5 rounded-2xl text-white font-black text-sm shadow-lg flex items-center justify-center gap-2" style="background-color:#25d366"><span>💬</span> Enviar Comprobante por WhatsApp</a>
+<div class="pt-1"><button id="payBack" class="text-xs font-bold text-stone-400 underline">← Volver</button></div>
+</div>
+</div>
+<script type="module">
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { firebaseConfig } from "./firebase-config.js";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00"];
+let canchas = [], reservas = [], selCancha = null, selHoras = [];
+function canchaImg(c){
+  if (c.ImagenCancha && String(c.ImagenCancha).startsWith("data:image"))
+    return `<img src="${c.ImagenCancha}" alt="" class="w-full h-32 object-cover rounded-xl">`;
+  return `<div class="text-5xl text-center">🏟️</div>`;
+}
+// Mayúsculas automáticas al escribir (excepto correos, números y fechas)
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+    const tipo = (t.getAttribute("type") || "text").toLowerCase();
+    if (tipo === "text") {
+      const pos = t.selectionStart;
+      t.value = t.value.toUpperCase();
+      try { t.setSelectionRange(pos, pos); } catch(err) {}
+    }
+  }
+});
+document.getElementById("fFecha").valueAsDate = new Date();
+document.getElementById("btnShare").href = "https://wa.me/?text=" + encodeURIComponent("⚽ Reserva tu cancha aquí sin cuenta: " + location.href);
+onSnapshot(collection(db, "Cancha"), (s) => {
+  canchas = []; s.forEach(d => canchas.push({ id: d.id, ...d.data() }));
+  const g = document.getElementById("grid"); g.innerHTML = "";
+  canchas.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "bg-white rounded-3xl shadow-md p-5 flex flex-col gap-2";
+    d.style.cssText = "border:2px solid #86efac";
+    d.innerHTML = `${canchaImg(c)}
+      <b class="text-lg" style="color:#14532d">${c.NombreCancha||""}</b>
+      <span class="text-sm font-semibold" style="color:#15803d">Bs ${Number(c.PrecioHora||0).toFixed(2)} / hora</span>
+      <span class="text-xs" style="color:#65803d">${c.DireccionCancha||""}</span>`;
+    const b = document.createElement("button");
+    b.textContent = "📅 Reservar";
+    b.className = "text-white font-extrabold text-sm px-4 py-2.5 rounded-xl shadow-md mt-1";
+    b.style.background = "linear-gradient(90deg,#15803d,#22c55e)";
+    b.onclick = () => { selCancha = c; selHoras = []; document.getElementById("boxRes").style.display = ""; pintarSlots(); window.scrollTo({ top: document.getElementById("boxRes").offsetTop - 80 }); };
+    d.appendChild(b); g.appendChild(d);
+  });
+});
+onSnapshot(collection(db, "Reserva"), (s) => {
+  reservas = []; s.forEach(d => reservas.push({ id: d.id, ...d.data() }));
+  pintarSlots();
+});
+function horaFin(h, n){ const [hh] = h.split(":").map(Number); return String(hh + n).padStart(2, "0") + ":00"; }
+function solapa(a1, a2, b1, b2){ return a1 < b2 && b1 < a2; }
+function pintarSlots(){
+  const box = document.getElementById("slots"); if (!box || !selCancha) return;
+  const fecha = document.getElementById("fFecha").value;
+  document.getElementById("rCancha").textContent = selCancha.NombreCancha;
+  document.getElementById("rFecha").textContent = fecha;
+  box.innerHTML = "";
+  HORAS.forEach(h => {
+    const fin = horaFin(h, 1);
+    const ocup = reservas.some(r => r.IdCancha === selCancha.id && r.FechaReserva === fecha && r.EstadoReserva !== "cancelada" && solapa(h, fin, r.HoraInicio, r.HoraFin));
+    const b = document.createElement("button");
+    b.textContent = h;
+    b.className = "py-2.5 rounded-xl text-sm font-black";
+    if (ocup) { b.disabled = true; b.style.cssText = "background:#e5e7eb;color:#9ca3af"; }
+    else {
+      const on = selHoras.includes(h);
+      b.style.cssText = on ? "background:#14532d;color:#fff" : "background:#f0fdf4;color:#14532d;border:2px solid #86efac";
+      b.onclick = () => { selHoras = on ? selHoras.filter(x => x !== h) : [...selHoras, h].sort(); pintarSlots(); };
+    }
+    box.appendChild(b);
+  });
+  document.getElementById("rHoras").textContent = selHoras.length;
+  document.getElementById("rTotal").textContent = "Bs. " + (Number(selCancha.PrecioHora || 0) * selHoras.length).toFixed(2);
+}
+document.getElementById("fFecha").onchange = pintarSlots;
+document.getElementById("btnReservar").onclick = async () => {
+  if (!selCancha || !selHoras.length) return alert("Elige cancha y al menos 1 hora");
+  const nom = document.getElementById("cNom").value.trim();
+  const tel = document.getElementById("cTel").value.trim();
+  if (!nom || !tel) return alert("Pon tu nombre y celular");
+  const fecha = document.getElementById("fFecha").value;
+  const ini = selHoras[0], fin = horaFin(selHoras[selHoras.length - 1], 1);
+  const choque = reservas.some(r => r.IdCancha === selCancha.id && r.FechaReserva === fecha && r.EstadoReserva !== "cancelada" && solapa(ini, fin, r.HoraInicio, r.HoraFin));
+  if (choque) { alert("Ese horario se acaba de ocupar, elige otro"); pintarSlots(); return; }
+  const total = Number(selCancha.PrecioHora || 0) * selHoras.length;
+  try {
+    const cliRef = await addDoc(collection(db, "Cliente"), { NombreCliente: nom, ApellidoCliente: "", TelefonoCliente: tel, DireccionCliente: "", CorreoCliente: "", createdAt: serverTimestamp() });
+    const resRef = await addDoc(collection(db, "Reserva"), {
+      IdCancha: selCancha.id, FechaReserva: fecha, HoraInicio: ini, HoraFin: fin,
+      TotalReserva: total, EstadoReserva: "pendiente", IdCliente: cliRef.id, IdUsuario: "", createdAt: serverTimestamp()
+    });
+    document.getElementById("payNum").textContent = "Reserva #" + resRef.id.slice(0, 6).toUpperCase();
+    document.getElementById("payDet").textContent = `${selCancha.NombreCancha} — ${fecha} ${ini} a ${fin}`;
+    document.getElementById("payTotal").textContent = "Bs. " + total.toFixed(2);
+    document.getElementById("payWa").href = "https://wa.me/59168951374?text=" + encodeURIComponent(`Hola ⚽, reservé ${selCancha.NombreCancha} el ${fecha} de ${ini} a ${fin} por Bs. ${total.toFixed(2)}. Soy ${nom}. Aquí adjunto mi comprobante:`);
+    document.getElementById("modalPay").style.display = "flex";
+    selHoras = []; pintarSlots();
+  } catch(e) { alert("Error: " + e.message); }
+};
+document.getElementById("payBack").onclick = () => document.getElementById("modalPay").style.display = "none";
+</script>
+</body>
+</html>

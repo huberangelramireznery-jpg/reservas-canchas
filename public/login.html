@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Reservas Canchas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#f0fdf4;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:16px}
+.card{background:#fff;width:380px;max-width:100%;border-radius:20px;padding:30px 25px;box-shadow:0 8px 20px rgba(0,0,0,.15);text-align:center;border-top:6px solid #15803d}
+h2{color:#14532d}h3{color:#16a34a;font-size:14px;margin-bottom:18px}
+.input{background:#f0fdf4;border:1px solid #15803d;border-radius:25px;margin-bottom:12px;display:flex;align-items:center;padding:10px 18px}
+.input input{background:transparent;border:none;outline:none;width:100%;font-size:16px}
+.btn{background:#15803d;color:#fff;border:none;width:100%;padding:13px;border-radius:25px;font-size:16px;font-weight:bold;cursor:pointer}
+#msg{margin-top:12px;font-size:13px;color:#b91c1c;min-height:18px}
+a{color:#15803d;font-size:13px}
+</style>
+<script type="importmap">{ "imports": {
+"firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+"firebase/auth": "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js",
+"firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+} }</script>
+</head>
+<body>
+<div class="card">
+<h2>⚽ RESERVAS</h2><h3>CANCHAS SINTÉTICAS</h3>
+<form id="formLogin">
+<div class="input">👤 <input id="email" type="email" placeholder="Correo" required autocomplete="username"></div>
+<div class="input">🔒 <input id="pass" type="password" placeholder="Password" required autocomplete="current-password"></div>
+<button type="submit" class="btn">Entrar</button>
+</form>
+<div id="msg"></div>
+<p style="margin-top:10px"><a href="registro.html">Crear cuenta</a> · <a href="index.html">Ver canchas</a></p>
+</div>
+<script type="module">
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { firebaseConfig } from "./firebase-config.js";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const msg = document.getElementById("msg");
+document.getElementById("formLogin").onsubmit = async (e) => {
+  e.preventDefault();
+  msg.textContent = "Verificando...";
+  try {
+    const cred = await signInWithEmailAndPassword(auth, document.getElementById("email").value.trim(), document.getElementById("pass").value);
+    const snap = await getDoc(doc(db, "Usuario", cred.user.uid));
+    if (!snap.exists() || snap.data().Estado !== "aprobado") {
+      msg.textContent = "Cuenta pendiente o sin ficha. Pide aprobación al dueño.";
+      await signOut(auth); return;
+    }
+    location.href = "index.html";
+  } catch(err) { msg.textContent = "Error: " + err.code; }
+};
+</script>
+</body>
+</html>

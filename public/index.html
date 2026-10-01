@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservas Canchas ⚽</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script type="importmap">{ "imports": {
+"firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+"firebase/auth": "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js",
+"firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+} }</script>
+<style>input[type="text"],input:not([type]),textarea{text-transform:uppercase}</style>
+</head>
+<body class="font-sans antialiased text-stone-800 bg-stone-50">
+<header class="bg-white border-b-2 sticky top-0 z-30" style="border-color:#86efac">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 py-3">
+<div>
+<h2 class="font-black text-2xl leading-tight flex items-center gap-2" style="color:#14532d"><span class="text-3xl">⚽</span><span>Reserva tu Cancha</span></h2>
+<p class="text-xs font-semibold hidden sm:block" style="color:#15803d">Elige cancha, hora y paga con QR. <span style="opacity:.6">v1</span></p>
+</div>
+<div class="flex items-center gap-2">
+<button data-v="admin" id="navAdmin" style="display:none;background-color:#14532d" class="px-3 py-2 rounded-2xl text-xs font-black text-white shadow-md">⚙️ Panel</button>
+<button data-v="reservas" id="navRes" style="display:none;background-color:#f0fdf4;color:#14532d;border:1.5px solid #86efac" class="px-3 py-2 rounded-2xl text-xs font-black shadow-xs">📋 Reservas</button>
+<button data-v="presencial" id="navPres" style="display:none;background-color:#f0fdf4;color:#14532d;border:1.5px solid #86efac" class="px-3 py-2 rounded-2xl text-xs font-black shadow-xs">🏟️ Presencial</button>
+<button data-v="reportes" id="navRep" style="display:none;background-color:#f0fdf4;color:#14532d;border:1.5px solid #86efac" class="px-3 py-2 rounded-2xl text-xs font-black shadow-xs">📄 Reportes</button>
+<a id="btnShare" href="#" target="_blank" style="background-color:#25d366" class="px-3 py-2 rounded-2xl text-xs font-black text-white shadow-md">📲 <span class="hidden sm:inline">Compartir</span></a>
+<button id="btnLogin" class="px-3 py-2 rounded-2xl text-xs font-black shadow-xs" style="background-color:#f0fdf4;color:#14532d;border:1.5px solid #86efac">Login</button>
+</div>
+</div>
+</header>
+<div class="min-h-screen py-6" style="background:linear-gradient(180deg,#f0fdf4 0%,#ecfdf5 40%,#f7fef9 100%)">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+<div id="msgOk" style="display:none" class="p-4 rounded-2xl font-bold text-sm shadow-sm"><span>✅</span> <span id="msgOkTxt"></span></div>
+
+<div class="view space-y-6" id="v-catalogo">
+<div class="rounded-3xl p-5 sm:p-8 text-white shadow-lg relative overflow-hidden" style="background:linear-gradient(135deg,#14532d 0%,#15803d 50%,#22c55e 100%);border:2px solid #86efac">
+<div class="relative z-10 max-w-xl">
+<span class="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider" style="background-color:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4)">Deporte en Trinidad</span>
+<h3 class="text-xl sm:text-2xl font-black mt-3">¡Tu cancha lista en 1 minuto!</h3>
+<p class="text-green-100 text-xs sm:text-sm font-semibold mt-1.5">Sin cuenta: elige hora, deja tus datos y paga con QR.</p>
+</div>
+<div class="absolute -right-4 -bottom-6 text-7xl opacity-20 select-none">⚽</div>
+</div>
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-lg" style="color:#14532d">1️⃣ Elige fecha</h3>
+<input id="fFecha" type="date" class="mt-2 p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac">
+</div>
+<div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</div>
+
+<div class="view" id="v-reservar" style="display:none">
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">2️⃣ Elige tu hora — <span id="rCancha"></span> (<span id="rFecha"></span>)</h3>
+<p class="text-xs font-semibold mt-1" style="color:#15803d">Verde = libre · Gris = ocupado</p>
+<div id="slots" class="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-4"></div>
+</div>
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">3️⃣ Tus datos</h3>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+<input id="cNom" placeholder="Nombre completo" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+<input id="cTel" placeholder="Celular / WhatsApp" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+</div>
+<div class="mt-4 p-3 rounded-xl flex justify-between items-center" style="background-color:#f0fdf4;border:1px dashed #86efac">
+<span class="text-sm font-black" style="color:#14532d">Total (<span id="rHoras">0</span> hora(s)):</span>
+<span id="rTotal" class="text-xl font-black" style="color:#15803d">Bs. 0.00</span>
+</div>
+<button id="btnReservar" class="mt-3 w-full py-3.5 rounded-2xl text-white font-black shadow-lg" style="background-color:#15803d">💳 Confirmar y Pagar con QR</button>
+</div>
+</div>
+
+<div class="view space-y-6" id="v-reservas" style="display:none">
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">📋 Reservas</h3>
+<div class="mt-3 mb-2"><button id="btnVaciarRes" class="px-4 py-2 rounded-xl font-black text-sm text-white shadow-md" style="background-color:#dc2626">🗑️ Vaciar todo</button></div>
+<div class="overflow-x-auto mt-3"><table class="w-full text-sm"><thead><tr style="color:#15803d"><th class="text-left p-2">#</th><th class="text-left p-2">Fecha</th><th class="text-left p-2">Hora</th><th class="text-left p-2">Cancha</th><th class="text-left p-2">Cliente</th><th class="text-left p-2">Total</th><th class="text-left p-2">Estado</th><th class="p-2">Acción</th></tr></thead><tbody id="tbRes"></tbody></table></div>
+</div>
+</div>
+
+<div class="view space-y-6" id="v-admin" style="display:none">
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">🏟️ Canchas</h3>
+<div class="flex gap-2 flex-wrap mt-3">
+<input type="hidden" id="kId">
+<input id="kNom" placeholder="Nombre (Cancha 1)" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+<input id="kPrecio" type="number" placeholder="Precio/hora Bs" class="p-2.5 rounded-xl border-2 text-sm font-semibold w-32" style="border-color:#86efac">
+<input id="kDir" placeholder="Dirección" class="p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac">
+</div>
+<div class="flex gap-2 flex-wrap items-center mt-3">
+<label class="text-xs font-extrabold px-4 py-2.5 rounded-xl cursor-pointer" style="background:#f0fdf4;color:#14532d;border:1.5px solid #86efac">🖼️ Foto de la cancha <input id="kImg" type="file" accept="image/*" style="display:none"></label>
+<img id="kPreview" alt="" style="display:none;width:64px;height:64px;object-fit:cover;border-radius:12px;border:2px solid #86efac">
+<span id="kImgName" class="text-xs font-semibold" style="color:#15803d"></span>
+</div>
+<div class="flex gap-2 flex-wrap mt-3">
+<button id="btnKAdd" class="text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md" style="background:linear-gradient(90deg,#15803d,#22c55e)">Guardar</button>
+<button id="btnKCancel" class="text-xs font-extrabold px-4 py-2.5 rounded-xl" style="display:none;background:#f1f5f9;color:#475569">Cancelar</button>
+</div>
+<div id="tbCan" class="mt-3 text-sm font-semibold" style="color:#15803d"></div>
+</div>
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">💰 Pagos QR recibidos</h3>
+<div class="mt-3 mb-2"><button id="btnVaciarPagos" class="px-4 py-2 rounded-xl font-black text-sm text-white shadow-md" style="background-color:#dc2626">🗑️ Vaciar todo</button></div>
+<div class="overflow-x-auto mt-3"><table class="w-full text-sm"><thead><tr style="color:#15803d"><th class="text-left p-2">#</th><th class="text-left p-2">Reserva</th><th class="text-left p-2">Monto</th><th class="text-left p-2">Método</th><th class="text-left p-2">Estado</th><th class="p-2">Acción</th></tr></thead><tbody id="tbPagos"></tbody></table></div>
+</div>
+<div class="bg-white rounded-3xl p-5 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">👤 Usuarios pendientes</h3>
+<div id="tbUsers" class="mt-2 text-sm font-semibold" style="color:#15803d">Cargando...</div>
+</div>
+</div>
+
+<!-- ============ VISTA PRESENCIAL ============ -->
+<div class="view space-y-6" id="v-presencial" style="display:none">
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<h3 class="font-black text-xl" style="color:#14532d">🏟️ Alquiler presencial</h3>
+<p class="text-xs font-semibold mt-1" style="color:#15803d">Cliente en mostrador: se registra aceptado y genera su pago al instante.</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Cancha</label>
+<select id="prCan" class="w-full p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac"></select></div>
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Fecha</label>
+<input id="prFecha" type="date" class="w-full p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac"></div>
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Hora inicio</label>
+<select id="prIni" class="w-full p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac"></select></div>
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Hora fin</label>
+<select id="prFin" class="w-full p-2.5 rounded-xl border-2 text-sm font-bold" style="border-color:#86efac"></select></div>
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Cliente</label>
+<input id="prNom" placeholder="Nombre completo" class="w-full p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac"></div>
+<div><label class="block text-xs font-black mb-1" style="color:#14532d">Celular</label>
+<input id="prTel" placeholder="Celular" class="w-full p-2.5 rounded-xl border-2 text-sm font-semibold" style="border-color:#86efac"></div>
+</div>
+<div class="mt-4 p-3 rounded-xl flex justify-between items-center" style="background-color:#f0fdf4;border:1px dashed #86efac">
+<span class="text-sm font-black" style="color:#14532d">Total:</span>
+<span id="prTotal" class="text-xl font-black" style="color:#15803d">Bs. 0.00</span>
+</div>
+<button id="btnPres" class="mt-3 w-full py-3.5 rounded-2xl text-white font-black shadow-lg" style="background-color:#15803d">✅ Registrar alquiler</button>
+</div>
+</div>
+
+<!-- ============ VISTA REPORTES ============ -->
+<div class="view space-y-6" id="v-reportes" style="display:none">
+<div class="bg-white rounded-3xl p-5 sm:p-8 shadow-md" style="border:2px solid #86efac">
+<div class="flex items-center justify-between flex-wrap gap-3">
+<h3 class="font-black text-xl" style="color:#14532d">📄 Reporte de ingresos</h3>
+<div class="flex gap-2 flex-wrap">
+<button id="btnRepExcel" class="px-4 py-2.5 rounded-xl text-white font-bold text-sm shadow" style="background-color:#15803d">📊 Excel</button>
+<button id="btnRepPrint" class="px-4 py-2.5 rounded-xl text-white font-bold text-sm shadow" style="background-color:#0e7490">🖨️ Imprimir</button>
+</div>
+</div>
+<h4 class="font-black text-sm mt-4" style="color:#15803d">🏟️ Presencial</h4>
+<div class="overflow-x-auto mt-2"><table class="w-full text-sm"><thead><tr style="color:#15803d"><th class="text-left p-2">#</th><th class="text-left p-2">Fecha</th><th class="text-left p-2">Cancha</th><th class="text-left p-2">Monto</th></tr></thead><tbody id="tbRepPres"></tbody></table></div>
+<div class="mt-2 p-2 rounded-xl text-right" style="background-color:#f0fdf4;border:1px solid #86efac">
+<span class="text-xs font-black" style="color:#14532d">SUBTOTAL PRESENCIAL: </span>
+<span id="repTotPres" class="font-black" style="color:#15803d">Bs 0.00</span>
+</div>
+<h4 class="font-black text-sm mt-4" style="color:#15803d">🌐 Reservas online</h4>
+<div class="overflow-x-auto mt-2"><table class="w-full text-sm"><thead><tr style="color:#15803d"><th class="text-left p-2">#</th><th class="text-left p-2">Fecha</th><th class="text-left p-2">Cancha</th><th class="text-left p-2">Monto</th></tr></thead><tbody id="tbRepOn"></tbody></table></div>
+<div class="mt-2 p-2 rounded-xl text-right" style="background-color:#fffbeb;border:1px solid #fde68a">
+<span class="text-xs font-black" style="color:#92400e">SUBTOTAL ONLINE: </span>
+<span id="repTotOn" class="font-black" style="color:#b45309">Bs 0.00</span>
+</div>
+<div class="mt-3 p-3 rounded-xl text-right" style="background-color:#14532d">
+<span class="text-sm font-black text-green-200">TOTAL INGRESOS: </span>
+<span id="repTotIng" class="text-2xl font-black text-white">Bs 0.00</span>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div id="modalPay" style="display:none" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+<div class="max-w-md w-full bg-white p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-5" style="border:3px solid #86efac">
+<div><span class="text-4xl">🎉</span>
+<h1 class="text-2xl font-black mt-2" style="color:#14532d">¡Reserva Registrada!</h1>
+<p class="text-xs font-bold text-stone-500 mt-1">Escanea el QR desde tu app bancaria</p></div>
+<div class="p-4 rounded-2xl text-left space-y-1.5" style="background-color:#f0fdf4;border:1.5px solid #86efac">
+<p id="payNum" class="text-[10px] font-black uppercase text-stone-400"></p>
+<p id="payDet" class="font-black text-base" style="color:#14532d"></p>
+<div class="pt-2 border-t mt-2 flex justify-between items-center" style="border-color:#86efac">
+<span class="font-black text-sm" style="color:#14532d">Total a Pagar:</span>
+<span id="payTotal" class="text-2xl font-black" style="color:#15803d"></span>
+</div>
+</div>
+<div class="p-3 bg-white rounded-2xl shadow-md border-2 mx-auto w-fit" style="border-color:#86efac">
+<img src="imagenes/mi-qr.png" alt="QR de pago" class="w-56 h-56 object-contain rounded-xl">
+</div>
+<p class="text-xs font-semibold text-stone-600">Luego presiona abajo para enviarnos tu comprobante.</p>
+<a id="payWa" href="#" target="_blank" class="w-full py-3.5 rounded-2xl text-white font-black text-sm shadow-lg flex items-center justify-center gap-2" style="background-color:#25d366"><span>💬</span> Enviar Comprobante por WhatsApp</a>
+<div class="pt-1"><button id="payBack" class="text-xs font-bold text-stone-400 underline">← Volver</button></div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { getFirestore, collection, getDoc, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, query, where } from "firebase/firestore";
+import { firebaseConfig } from "./firebase-config.js";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00"];
+let canchas = [], reservas = [], pagos = [], miRol = "", selCancha = null, selHoras = [];
+// Mayúsculas automáticas al escribir (excepto correos, claves, números y fechas)
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+    const tipo = (t.getAttribute("type") || "text").toLowerCase();
+    if (tipo === "text" && t.type !== "email" && t.type !== "password") {
+      const pos = t.selectionStart;
+      t.value = t.value.toUpperCase();
+      try { t.setSelectionRange(pos, pos); } catch(err) {}
+    }
+  }
+});
+let imgCancha = "";
+document.getElementById("kImg").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById("kImgName").textContent = f.name;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 700;
+      const sc = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * sc);
+      cv.height = Math.round(img.height * sc);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      imgCancha = cv.toDataURL("image/jpeg", 0.72);
+      const pv = document.getElementById("kPreview");
+      pv.src = imgCancha; pv.style.display = "";
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+};
+function canchaImg(c){
+  if (c.ImagenCancha && String(c.ImagenCancha).startsWith("data:image"))
+    return `<img src="${c.ImagenCancha}" alt="" class="w-full h-32 object-cover rounded-xl">`;
+  return `<div class="text-5xl text-center">🏟️</div>`;
+}
+document.getElementById("fFecha").valueAsDate = new Date();
+document.getElementById("btnShare").href = "https://wa.me/?text=" + encodeURIComponent("⚽ Reserva tu cancha aquí sin cuenta ni login: https://reservas-canchas-2026.web.app/catalogo.html");
+function esAdmin(){ return ["admin","administrador","dueno"].includes(miRol); }
+function show(v){
+  document.querySelectorAll(".view").forEach(d => { d.style.display = "none"; d.setAttribute("hidden",""); });
+  const el = document.getElementById("v-" + v);
+  if (!el) return;
+  el.removeAttribute("hidden"); el.style.display = "";
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll("[data-v]").forEach(b => b.onclick = () => show(b.dataset.v));
+document.getElementById("btnLogin").onclick = () => {
+  if (auth.currentUser) signOut(auth).then(() => location.reload());
+  else location.href = "login.html";
+};
+onAuthStateChanged(auth, async (u) => {
+  document.getElementById("btnLogin").textContent = u ? "Salir" : "Login";
+  if (!u) return;
+  const me = await getDoc(doc(db, "Usuario", u.uid));
+  if (me.exists() && me.data().Estado === "aprobado") {
+    miRol = me.data().RolUsuario || "";
+    if (esAdmin() || miRol === "encargado") {
+      document.getElementById("navAdmin").style.display = "";
+      document.getElementById("navRes").style.display = "";
+      document.getElementById("navRep").style.display = "";
+      document.getElementById("navPres").style.display = "";
+      setupPrivado();
+    } else if (miRol === "cliente") {
+      document.getElementById("navRes").style.display = "";
+      setupPrivado();
+    }
+  }
+});
+const canchaNombre = (id) => canchas.find(c => c.id === id)?.NombreCancha || "-";
+onSnapshot(collection(db, "Cancha"), (s) => {
+  canchas = []; s.forEach(d => canchas.push({ id: d.id, ...d.data() }));
+  const g = document.getElementById("grid"); g.innerHTML = "";
+  canchas.filter(c => c.EstadoCancha !== "inactiva").forEach(c => {
+    const d = document.createElement("div");
+    d.className = "bg-white rounded-3xl shadow-md p-5 flex flex-col gap-2";
+    d.style.cssText = "border:2px solid #86efac";
+    d.innerHTML = `${canchaImg(c)}
+      <b class="text-lg" style="color:#14532d">${c.NombreCancha||""}</b>
+      <span class="text-sm font-semibold" style="color:#15803d">Bs ${Number(c.PrecioHora||0).toFixed(2)} / hora</span>
+      <span class="text-xs" style="color:#65803d">${c.DireccionCancha||""}</span>`;
+    const b = document.createElement("button");
+    b.textContent = "📅 Reservar";
+    b.className = "text-white font-extrabold text-sm px-4 py-2.5 rounded-xl shadow-md mt-1";
+    b.style.background = "linear-gradient(90deg,#15803d,#22c55e)";
+    b.onclick = () => { selCancha = c; selHoras = []; pintarSlots(); show("reservar"); };
+    d.appendChild(b); g.appendChild(d);
+  });
+  fillPresencial();
+  const tb = document.getElementById("tbCan"); tb.innerHTML = "";
+  canchas.forEach(c => {
+    const r = document.createElement("div"); r.className = "flex items-center gap-2 py-1";
+    const inact = c.EstadoCancha === "inactiva";
+    r.innerHTML = `<span>${c.NombreCancha} — Bs ${Number(c.PrecioHora||0)}/h${inact ? " (INACTIVA)" : ""}</span>`;
+    if (esAdmin() && inact) {
+      const re = document.createElement("button"); re.textContent = "♻️ Reactivar";
+      re.className = "text-xs font-extrabold px-3 py-1.5 rounded-xl"; re.style.cssText = "background:#dcfce7;color:#15803d";
+      re.onclick = async () => await updateDoc(doc(db, "Cancha", c.id), { EstadoCancha: "activa" });
+      r.appendChild(re);
+      tb.appendChild(r);
+      return;
+    }
+    if (esAdmin()) {
+      const ed = document.createElement("button"); ed.textContent = "✏️";
+      ed.className = "text-xs font-extrabold px-3 py-1.5 rounded-xl"; ed.style.cssText = "background:#f0fdf4;color:#15803d;border:1.5px solid #86efac";
+      ed.onclick = () => {
+        document.getElementById("kId").value = c.id;
+        document.getElementById("kNom").value = c.NombreCancha || "";
+        document.getElementById("kPrecio").value = c.PrecioHora || 0;
+        document.getElementById("kDir").value = c.DireccionCancha || "";
+        imgCancha = c.ImagenCancha || "";
+        const pv = document.getElementById("kPreview");
+        if (imgCancha) { pv.src = imgCancha; pv.style.display = ""; }
+        else pv.style.display = "none";
+        document.getElementById("kImg").value = "";
+        document.getElementById("btnKCancel").style.display = "";
+      };
+      r.appendChild(ed);
+    }
+    if (esAdmin()) {
+      const del = document.createElement("button"); del.textContent = "🗑️";
+      del.className = "text-xs font-extrabold px-3 py-1.5 rounded-xl"; del.style.cssText = "background:#fee2e2;color:#b91c1c";
+      del.onclick = async () => { if (confirm("¿Dar de baja la cancha? (No se borra de la base, queda inactiva)")) await updateDoc(doc(db, "Cancha", c.id), { EstadoCancha: "inactiva" }); };
+      r.appendChild(del);
+    }
+    tb.appendChild(r);
+  });
+});
+onSnapshot(collection(db, "Reserva"), (s) => {
+  reservas = []; s.forEach(d => reservas.push({ id: d.id, ...d.data() }));
+  pintarSlots(); renderReservas();
+});
+function horaFin(h, n){ const [hh] = h.split(":").map(Number); return String(hh + n).padStart(2, "0") + ":00"; }
+function solapa(a1, a2, b1, b2){ return a1 < b2 && b1 < a2; }
+function pintarSlots(){
+  const box = document.getElementById("slots"); if (!box || !selCancha) return;
+  const fecha = document.getElementById("fFecha").value;
+  document.getElementById("rCancha").textContent = selCancha.NombreCancha;
+  document.getElementById("rFecha").textContent = fecha;
+  box.innerHTML = "";
+  HORAS.forEach(h => {
+    const fin = horaFin(h, 1);
+    const ocup = reservas.some(r => r.IdCancha === selCancha.id && r.FechaReserva === fecha && r.EstadoReserva !== "rechazada" && r.EstadoReserva !== "archivada" && solapa(h, fin, r.HoraInicio, r.HoraFin));
+    const b = document.createElement("button");
+    b.textContent = h;
+    b.className = "py-2.5 rounded-xl text-sm font-black";
+    if (ocup) { b.disabled = true; b.style.cssText = "background:#e5e7eb;color:#9ca3af"; }
+    else {
+      const on = selHoras.includes(h);
+      b.style.cssText = on ? "background:#14532d;color:#fff" : "background:#f0fdf4;color:#14532d;border:2px solid #86efac";
+      b.onclick = () => {
+        selHoras = on ? selHoras.filter(x => x !== h) : [...selHoras, h].sort();
+        pintarSlots();
+      };
+    }
+    box.appendChild(b);
+  });
+  const n = selHoras.length;
+  document.getElementById("rHoras").textContent = n;
+  document.getElementById("rTotal").textContent = "Bs. " + (Number(selCancha.PrecioHora || 0) * n).toFixed(2);
+}
+document.getElementById("fFecha").onchange = pintarSlots;
+document.getElementById("btnReservar").onclick = async () => {
+  if (!selCancha || !selHoras.length) return alert("Elige cancha y al menos 1 hora");
+  const nom = document.getElementById("cNom").value.trim();
+  const tel = document.getElementById("cTel").value.trim();
+  if (!nom || !tel) return alert("Pon tu nombre y celular");
+  const fecha = document.getElementById("fFecha").value;
+  const ini = selHoras[0], fin = horaFin(selHoras[selHoras.length - 1], 1);
+  const choque = reservas.some(r => r.IdCancha === selCancha.id && r.FechaReserva === fecha && r.EstadoReserva !== "rechazada" && r.EstadoReserva !== "archivada" && solapa(ini, fin, r.HoraInicio, r.HoraFin));
+  if (choque) { alert("Ese horario se acaba de ocupar, elige otro"); pintarSlots(); return; }
+  const total = Number(selCancha.PrecioHora || 0) * selHoras.length;
+  try {
+    const cliRef = await addDoc(collection(db, "Cliente"), { NombreCliente: nom, ApellidoCliente: "", TelefonoCliente: tel, DireccionCliente: "", CorreoCliente: "", createdAt: serverTimestamp() });
+    const resRef = await addDoc(collection(db, "Reserva"), {
+      IdCancha: selCancha.id, FechaReserva: fecha, HoraInicio: ini, HoraFin: fin,
+      TotalReserva: total, EstadoReserva: "pendiente", IdCliente: cliRef.id,
+      Origen: "online",
+      IdUsuario: auth.currentUser ? auth.currentUser.uid : "", createdAt: serverTimestamp()
+    });
+    document.getElementById("payNum").textContent = "Reserva #" + resRef.id.slice(0, 6).toUpperCase();
+    document.getElementById("payDet").textContent = `${selCancha.NombreCancha} — ${fecha} ${ini} a ${fin}`;
+    document.getElementById("payTotal").textContent = "Bs. " + total.toFixed(2);
+    document.getElementById("payWa").href = "https://wa.me/59168951374?text=" + encodeURIComponent(`Hola ⚽, reservé ${selCancha.NombreCancha} el ${fecha} de ${ini} a ${fin} por Bs. ${total.toFixed(2)}. Soy ${nom}. Aquí adjunto mi comprobante:`);
+    document.getElementById("modalPay").style.display = "flex";
+    selHoras = []; pintarSlots();
+  } catch(e) { alert("Error: " + e.message); }
+};
+document.getElementById("payBack").onclick = () => { document.getElementById("modalPay").style.display = "none"; show("catalogo"); };
+const HORAS_FIN = ["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"];
+function fillPresencial(){
+  const c = document.getElementById("prCan"), k = c.value;
+  c.innerHTML = "";
+  canchas.filter(x => x.EstadoCancha !== "inactiva").forEach(x => {
+    const o = document.createElement("option"); o.value = x.id;
+    o.textContent = `${x.NombreCancha} — Bs ${Number(x.PrecioHora||0)}/h`;
+    c.appendChild(o);
+  });
+  if ([...c.options].some(o => o.value === k)) c.value = k;
+  const ini = document.getElementById("prIni"), fin = document.getElementById("prFin");
+  const ki = ini.value, kf = fin.value;
+  ini.innerHTML = ""; HORAS.forEach(h => { const o = document.createElement("option"); o.value = h; o.textContent = h; ini.appendChild(o); });
+  fin.innerHTML = ""; HORAS_FIN.forEach(h => { const o = document.createElement("option"); o.value = h; o.textContent = h; fin.appendChild(o); });
+  if ([...ini.options].some(o => o.value === ki)) ini.value = ki;
+  if ([...fin.options].some(o => o.value === kf)) fin.value = kf;
+  if (!document.getElementById("prFecha").value) document.getElementById("prFecha").valueAsDate = new Date();
+  calcPresTotal();
+}
+["prCan","prIni","prFin","prFecha"].forEach(id => document.getElementById(id).onchange = calcPresTotal);
+function calcPresTotal(){
+  const c = canchas.find(x => x.id === document.getElementById("prCan").value);
+  const ini = document.getElementById("prIni").value, fin = document.getElementById("prFin").value;
+  const n = ini < fin ? (Number(fin.slice(0,2)) - Number(ini.slice(0,2))) : 0;
+  document.getElementById("prTotal").textContent = "Bs. " + (Number(c?.PrecioHora || 0) * n).toFixed(2);
+}
+document.getElementById("btnPres").onclick = async () => {
+  if (!esAdmin() && miRol !== "encargado") return alert("Sin permiso");
+  const c = canchas.find(x => x.id === document.getElementById("prCan").value);
+  const fecha = document.getElementById("prFecha").value;
+  const ini = document.getElementById("prIni").value, fin = document.getElementById("prFin").value;
+  const nom = document.getElementById("prNom").value.trim();
+  const tel = document.getElementById("prTel").value.trim();
+  if (!c || !fecha) return alert("Elige cancha y fecha");
+  if (!(ini < fin)) return alert("La hora fin debe ser mayor a la de inicio");
+  if (!nom || !tel) return alert("Pon nombre y celular del cliente");
+  const choque = reservas.some(r => r.IdCancha === c.id && r.FechaReserva === fecha && r.EstadoReserva !== "rechazada" && r.EstadoReserva !== "archivada" && solapa(ini, fin, r.HoraInicio, r.HoraFin));
+  if (choque) return alert("Ese horario está ocupado");
+  const n = Number(fin.slice(0,2)) - Number(ini.slice(0,2));
+  const total = Number(c.PrecioHora || 0) * n;
+  if (!confirm(`Registrar ${c.NombreCancha} ${fecha} ${ini}-${fin} por Bs ${total.toFixed(2)}?`)) return;
+  const cliRef = await addDoc(collection(db, "Cliente"), { NombreCliente: nom, ApellidoCliente: "", TelefonoCliente: tel, DireccionCliente: "Presencial", CorreoCliente: "", createdAt: serverTimestamp() });
+  const resRef = await addDoc(collection(db, "Reserva"), {
+    IdCancha: c.id, FechaReserva: fecha, HoraInicio: ini, HoraFin: fin,
+    TotalReserva: total, EstadoReserva: "aceptada", IdCliente: cliRef.id,
+    Origen: "presencial",
+    IdUsuario: auth.currentUser ? auth.currentUser.uid : "", createdAt: serverTimestamp()
+  });
+  await addDoc(collection(db, "Pago"), { IdReserva: resRef.id, MontoPago: total, MetodoPago: "QR", EstadoPago: "pendiente", createdAt: serverTimestamp() });
+  document.getElementById("prNom").value = ""; document.getElementById("prTel").value = "";
+  alert("Alquiler registrado y aceptado.");
+  imprimirTicket({
+    num: resRef.id.slice(0, 6).toUpperCase(), cancha: c.NombreCancha,
+    fecha: new Date().toLocaleString("es-BO", { timeZone: "America/La_Paz", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+    fechaRes: fecha, horas: ini + " - " + fin, cliente: nom, tel,
+    total: total.toFixed(2)
+  });
+};
+function ticketHtml(o){
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Ticket ${o.num}</title>
+  <style>body{font-family:Arial,sans-serif;max-width:320px;margin:10px auto;padding:0 10px;color:#111;font-size:13px}
+  .t{text-align:center;border:2px dashed #14532d;border-radius:12px;padding:14px}
+  .t h1{font-size:17px;margin:4px 0;color:#14532d}.t h2{font-size:14px;margin:2px 0}
+  table{width:100%;font-size:13px;margin:8px 0;border-collapse:collapse}
+  td{padding:3px 0}.tot{font-size:17px;font-weight:900}
+  .f{margin-top:26px;display:flex;justify-content:space-between;font-size:12px}.f div{text-align:center}</style></head><body>
+  <div class="t"><div style="font-size:34px">⚽</div>
+  <h1>RESERVA DE CANCHA</h1>
+  <p style="margin:2px 0">Ticket #${o.num} — ${o.fecha}</p>
+  <table>
+  <tr><td>Cancha:</td><td><b>${o.cancha}</b></td></tr>
+  <tr><td>Fecha:</td><td>${o.fechaRes}</td></tr>
+  <tr><td>Horario:</td><td>${o.horas}</td></tr>
+  <tr><td>Cliente:</td><td>${o.cliente}</td></tr>
+  <tr><td>Cel:</td><td>${o.tel}</td></tr>
+  <tr><td class="tot">TOTAL:</td><td class="tot">Bs ${o.total}</td></tr>
+  </table>
+  <p>Presentar este ticket al ingresar.</p>
+  <div class="f"><div>Entregado<br><br>______</div><div>Recibido<br><br>______</div></div>
+  </div><script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script></body></html>`;
+}
+function imprimirTicket(o){
+  const w = window.open("", "_blank", "width=420,height=700");
+  if (!w) return alert("Permite ventanas emergentes para el ticket");
+  w.document.write(ticketHtml(o));
+  w.document.close();
+}
+function renderReporte(){
+  const tbP = document.getElementById("tbRepPres"), tbO = document.getElementById("tbRepOn");
+  if (!tbP || !tbO) return;
+  const vis = pagos.filter(p => p.EstadoPago !== "archivado");
+  const conRes = vis.map(p => ({ p, r: reservas.find(x => x.id === p.IdReserva) })).filter(x => x.r && x.r.EstadoReserva !== "archivada");
+  const pres = conRes.filter(x => (x.r.Origen || "online") === "presencial");
+  const onl = conRes.filter(x => (x.r.Origen || "online") !== "presencial");
+  let n = 0;
+  tbP.innerHTML = pres.length ? "" : `<tr><td colspan="4" class="p-4 text-center">Sin ingresos presenciales.</td></tr>`;
+  pres.forEach(x => {
+    n++;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="p-2 font-black">${String(n).padStart(2, "0")}</td><td class="p-2">${fmtFechaBO(x.r.FechaReserva)}</td><td class="p-2">${canchaNombre(x.r.IdCancha)}</td><td class="p-2 font-black">Bs ${Number(x.p.MontoPago||0).toFixed(2)}</td>`;
+    tbP.appendChild(tr);
+  });
+  const totP = pres.reduce((a,x) => a + Number(x.p.MontoPago||0), 0);
+  document.getElementById("repTotPres").textContent = "Bs " + totP.toFixed(2);
+  n = 0;
+  tbO.innerHTML = onl.length ? "" : `<tr><td colspan="4" class="p-4 text-center">Sin ingresos online.</td></tr>`;
+  onl.forEach(x => {
+    n++;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="p-2 font-black">${String(n).padStart(2, "0")}</td><td class="p-2">${fmtFechaBO(x.r.FechaReserva)}</td><td class="p-2">${canchaNombre(x.r.IdCancha)}</td><td class="p-2 font-black">Bs ${Number(x.p.MontoPago||0).toFixed(2)}</td>`;
+    tbO.appendChild(tr);
+  });
+  const totO = onl.reduce((a,x) => a + Number(x.p.MontoPago||0), 0);
+  document.getElementById("repTotOn").textContent = "Bs " + totO.toFixed(2);
+  document.getElementById("repTotIng").textContent = "Bs " + (totP + totO).toFixed(2);
+}
+function fmtFechaBO(v){
+  try {
+    let d = null;
+    if (typeof v === "string" && v) d = new Date(v);
+    else if (v && typeof v.toDate === "function") d = v.toDate();
+    else if (v && v.seconds) d = new Date(v.seconds * 1000);
+    if (!d || isNaN(d)) return "-";
+    return d.toLocaleString("es-BO", { timeZone: "America/La_Paz", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch(e) { return "-"; }
+}
+document.getElementById("btnVaciarPagos").onclick = async () => {
+  if (!esAdmin()) return alert("Solo admin");
+  if (!pagos.length || !confirm("⚠️ ¿Archivar TODOS los pagos? (No se borran de la base, se ocultan)")) return;
+  for (const p of pagos) await updateDoc(doc(db, "Pago", p.id), { EstadoPago: "archivado" });
+};
+document.getElementById("btnRepPrint").onclick = () => window.print();
+document.getElementById("btnRepExcel").onclick = async () => {
+  try {
+    if (!window.ExcelJS) return alert("ExcelJS no cargó (internet).");
+    const wb = new window.ExcelJS.Workbook();
+    wb.creator = "Reservas Canchas";
+    const fill = (c) => ({ type: "pattern", pattern: "solid", fgColor: { argb: c } });
+    const thin = { top: { style: "thin", color: { argb: "FF86EFAC" } }, left: { style: "thin", color: { argb: "FF86EFAC" } }, bottom: { style: "thin", color: { argb: "FF86EFAC" } }, right: { style: "thin", color: { argb: "FF86EFAC" } } };
+    const fBO = (iso) => { try { return new Date(iso).toLocaleString("es-BO", { timeZone: "America/La_Paz", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch(e) { return String(iso || ""); } };
+    function hoja(name, color, lista) {
+      const s = wb.addWorksheet(name);
+      s.mergeCells("A1:D1");
+      s.getCell("A1").value = "⚽ RESERVAS CANCHAS — Ingresos " + name;
+      s.getCell("A1").font = { bold: true, size: 14, color: { argb: "FF14532D" } };
+      s.getCell("A1").alignment = { horizontal: "center" };
+      s.mergeCells("A2:D2");
+      s.getCell("A2").value = "Generado: " + fBO(new Date().toISOString()) + " (hora boliviana)";
+      s.getCell("A2").font = { size: 10, color: { argb: "FF64748B" } };
+      s.getCell("A2").alignment = { horizontal: "center" };
+      const h = s.addRow(["#", "Fecha", "Cancha", "Monto (Bs)"]);
+      h.eachCell(c => { c.fill = fill(color); c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 }; c.alignment = { horizontal: "center", vertical: "middle" }; c.border = thin; });
+      h.height = 22;
+      let n = 0;
+      lista.forEach(x => {
+        n++;
+        s.addRow([n, fBO(x.r.FechaReserva), canchaNombre(x.r.IdCancha), Number(x.p.MontoPago || 0)]);
+      });
+      s.columns = [{ width: 6 }, { width: 20 }, { width: 28 }, { width: 14 }];
+      s.eachRow((row, i) => {
+        if (i <= 2) return;
+        row.eachCell(c => { c.border = thin; c.alignment = { vertical: "middle", horizontal: "center" }; });
+        if (i % 2 === 0) row.eachCell(c => { c.fill = fill("FFF0FDF4"); });
+      });
+      s.getColumn(4).numFmt = '#,##0.00';
+      const tot = lista.reduce((a,x) => a + Number(x.p.MontoPago||0), 0);
+      const tr = s.addRow(["", "", "TOTAL", tot]);
+      tr.eachCell(c => { c.font = { bold: true, size: 12 }; c.fill = fill("FFFEF3C7"); c.border = thin; c.alignment = { horizontal: "center" }; });
+      return tot;
+    }
+    const vis = pagos.filter(p => p.EstadoPago !== "archivado");
+    const conRes = vis.map(p => ({ p, r: reservas.find(x => x.id === p.IdReserva) })).filter(x => x.r && x.r.EstadoReserva !== "archivada");
+    const tP = hoja("Presencial", "FF15803D", conRes.filter(x => (x.r.Origen || "online") === "presencial"));
+    const tO = hoja("Online", "FF0369A1", conRes.filter(x => (x.r.Origen || "online") !== "presencial"));
+    const r = wb.addWorksheet("Resumen");
+    r.mergeCells("A1:B1");
+    r.getCell("A1").value = "⚽ RESERVAS CANCHAS — Resumen de ingresos";
+    r.getCell("A1").font = { bold: true, size: 14, color: { argb: "FF14532D" } };
+    const rh = r.addRow(["Concepto", "Total (Bs)"]);
+    rh.eachCell(c => { c.fill = fill("FF14532D"); c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.border = thin; c.alignment = { horizontal: "center" }; });
+    [["🏟️ Presencial", tP], ["🌐 Online", tO], ["🔥 TOTAL", tP + tO]].forEach(([m, t]) => {
+      const row = r.addRow([m, t]);
+      row.eachCell(c => { c.border = thin; c.alignment = { horizontal: "center" }; });
+      row.getCell(2).numFmt = '#,##0.00';
+    });
+    r.columns = [{ width: 24 }, { width: 16 }];
+    const buf = await wb.xlsx.writeBuffer();
+    const u = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const l = document.createElement("a"); l.href = u; l.download = "ingresos-canchas.xlsx"; l.click();
+    setTimeout(() => URL.revokeObjectURL(u), 3000);
+  } catch(e) { console.error(e); alert("Error Excel: " + e.message); }
+};
+function renderReservas(){
+  const tb = document.getElementById("tbRes"); if (!tb) return;
+  const base = reservas.filter(r => r.EstadoReserva !== "archivada");
+  const lista = miRol === "cliente" && auth.currentUser
+    ? base.filter(r => r.IdUsuario === auth.currentUser.uid)
+    : base;
+  tb.innerHTML = lista.length ? "" : `<tr><td colspan="8" class="p-4 text-center">Sin reservas.</td></tr>`;
+  const orden = [...lista].sort((a,b) => String(a.FechaReserva+""+a.HoraInicio).localeCompare(String(b.FechaReserva+""+b.HoraInicio)));
+  orden.forEach((r, n) => {
+    const st = String(r.EstadoReserva || "pendiente").toLowerCase();
+    const badge = st === "aceptada" || st === "confirmada"
+      ? `<span class="px-3 py-1 rounded-full text-xs font-extrabold" style="background-color:#dcfce7;color:#15803d;border:1px solid #86efac">✅ Aceptada</span>`
+      : st === "rechazada" || st === "cancelada"
+      ? `<span class="px-3 py-1 rounded-full text-xs font-extrabold" style="background-color:#fee2e2;color:#b91c1c;border:1px solid #fca5a5">❌ Rechazada</span>`
+      : `<span class="px-3 py-1 rounded-full text-xs font-extrabold" style="background-color:#fef3c7;color:#78350f;border:1px solid #fde68a">⏳ Pendiente</span>`;
+    const tr = document.createElement("tr");
+    tr.dataset.id = r.id;
+    tr.innerHTML = `<td class="p-2 font-black">${String(n + 1).padStart(2, "0")}</td><td class="p-2">${r.FechaReserva||""}</td><td class="p-2">${r.HoraInicio||""}-${r.HoraFin||""}</td><td class="p-2">${canchaNombre(r.IdCancha)}</td><td class="p-2">${r._cli||""}</td><td class="p-2 font-black">Bs ${Number(r.TotalReserva||0).toFixed(2)}</td><td class="p-2">${r.EstadoReserva||""}</td><td class="p-2"></td>`;
+    const st2 = String(r.EstadoReserva || "pendiente").toLowerCase();
+    if ((st2 === "aceptada" || st2 === "confirmada") || st2 === "rechazada" || st2 === "cancelada") {
+      const done = document.createElement("span");
+      done.className = "text-xs font-extrabold px-2 py-1 rounded-lg";
+      done.style.cssText = (st2 === "aceptada" || st2 === "confirmada") ? "background:#dcfce7;color:#15803d" : "background:#fee2e2;color:#b91c1c";
+      done.textContent = (st2 === "aceptada" || st2 === "confirmada") ? "Aceptado" : "Rechazado";
+      tr.lastChild.appendChild(done);
+    } else if (miRol !== "cliente") {
+    const ok = document.createElement("button"); ok.textContent = "✓ Aceptar";
+    ok.className = "text-xs font-extrabold px-2 py-1 rounded-lg text-white bg-emerald-600";
+    ok.onclick = async () => {
+      if (!confirm("¿Aceptar reserva? Recién aparecerá en pagos recibidos.")) return;
+      await updateDoc(doc(db, "Reserva", r.id), { EstadoReserva: "aceptada" });
+      await addDoc(collection(db, "Pago"), { IdReserva: r.id, MontoPago: Number(r.TotalReserva || 0), MetodoPago: "QR", EstadoPago: "pendiente", createdAt: serverTimestamp() });
+    };
+    const no = document.createElement("button"); no.textContent = "✕ Rechazar";
+    no.className = "text-xs font-extrabold px-2 py-1 rounded-lg text-white bg-red-600 ml-1";
+    no.onclick = async () => { if (confirm("¿Rechazar reserva? Libera el horario.")) await updateDoc(doc(db, "Reserva", r.id), { EstadoReserva: "rechazada" }); };
+    if (miRol !== "cliente") tr.lastChild.append(ok, no);
+    }
+    tb.appendChild(tr);
+  });
+  cargarNombres();
+}
+async function cargarNombres(){
+  for (const r of reservas) {
+    if (r._cli || !r.IdCliente) continue;
+    try {
+      const c = await getDoc(doc(db, "Cliente", r.IdCliente));
+      r._cli = c.exists() ? (c.data().NombreCliente || "") + " " + (c.data().TelefonoCliente || "") : "-";
+    } catch(e) { r._cli = "-"; }
+  }
+  renderReservasNombres();
+}
+function renderReservasNombres(){
+  document.querySelectorAll("#tbRes tr").forEach((tr) => {
+    const r = reservas.find(x => x.id === tr.dataset.id);
+    if (r && r._cli && tr.children[4]) tr.children[4].textContent = r._cli;
+  });
+}
+document.getElementById("btnVaciarRes").onclick = async () => {
+  if (!esAdmin()) return alert("Solo admin");
+  const vis = reservas.filter(r => r.EstadoReserva !== "archivada");
+  if (!vis.length || !confirm("⚠️ ¿Archivar TODAS las reservas? (No se borran de la base, la numeración vuelve a empezar)")) return;
+  for (const r of vis) await updateDoc(doc(db, "Reserva", r.id), { EstadoReserva: "archivada" });
+};
+let _priv = [];
+function setupPrivado(){
+  _priv.forEach(u => { try { u(); } catch(e) {} });
+  _priv = [];
+  _priv.push(onSnapshot(collection(db, "Pago"), (s) => {
+    pagos = []; s.forEach(d => pagos.push({ id: d.id, ...d.data() }));
+    const tb = document.getElementById("tbPagos"); tb.innerHTML = "";
+    let np = 0;
+    s.forEach(d => {
+      const p = { id: d.id, ...d.data() };
+      if (p.EstadoPago === "archivado") return;
+      np++;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="p-2 font-black">${String(np).padStart(2, "0")}</td><td class="p-2">${String(p.IdReserva||"").slice(0,6)}</td><td class="p-2 font-black">Bs ${Number(p.MontoPago||0).toFixed(2)}</td><td class="p-2">${p.MetodoPago||""}</td><td class="p-2">${p.EstadoPago||""}</td><td class="p-2"></td>`;
+      const ok = document.createElement("button"); ok.textContent = "✓ Verificado";
+      ok.className = "text-xs font-extrabold px-2 py-1 rounded-lg text-white bg-emerald-600";
+      ok.onclick = async () => updateDoc(doc(db, "Pago", p.id), { EstadoPago: "verificado" });
+      tr.lastChild.appendChild(ok); tb.appendChild(tr);
+    });
+    if (!tb.children.length) tb.innerHTML = `<tr><td colspan="5" class="p-4 text-center">Sin pagos.</td></tr>`;
+    renderReporte();
+  }));
+  _priv.push(onSnapshot(query(collection(db, "Usuario"), where("Estado", "==", "pendiente")), (s) => {
+    const el = document.getElementById("tbUsers");
+    el.innerHTML = s.empty ? "Sin pendientes." : "";
+    s.forEach(d => {
+      const u = d.data(); const row = document.createElement("div"); row.className = "flex items-center gap-2 py-1";
+      row.innerHTML = `<span>${u.CorreoUsuario} — ${u.RolUsuario}</span>`;
+      const ok = document.createElement("button"); ok.textContent = "Aprobar";
+      ok.className = "text-white font-extrabold text-xs px-3 py-1.5 rounded-xl"; ok.style.background = "#16a34a";
+      ok.onclick = async () => updateDoc(doc(db, "Usuario", d.id), { Estado: "aprobado" });
+      const no = document.createElement("button"); no.textContent = "Rechazar";
+      no.className = "text-white font-extrabold text-xs px-3 py-1.5 rounded-xl"; no.style.background = "#dc2626";
+      no.onclick = async () => { if (confirm("¿Rechazar?")) await updateDoc(doc(db, "Usuario", d.id), { Estado: "rechazado" }); };
+      row.append(ok, no); el.appendChild(row);
+    });
+  }));
+}
+document.getElementById("btnKAdd").onclick = async () => {
+  if (!esAdmin() && miRol !== "encargado") return alert("Sin permiso");
+  const NombreCancha = document.getElementById("kNom").value.trim();
+  if (!NombreCancha) return alert("Nombre requerido");
+  const data = {
+    NombreCancha, PrecioHora: Number(document.getElementById("kPrecio").value || 0),
+    DireccionCancha: document.getElementById("kDir").value.trim(), EstadoCancha: "activa",
+    ImagenCancha: imgCancha, createdAt: serverTimestamp()
+  };
+  const id = document.getElementById("kId").value;
+  if (id) { if (!imgCancha) delete data.ImagenCancha; await updateDoc(doc(db, "Cancha", id), data); }
+  else await addDoc(collection(db, "Cancha"), data);
+  ["kId","kNom","kPrecio","kDir"].forEach(x => document.getElementById(x).value = "");
+  imgCancha = ""; document.getElementById("kImg").value = "";
+  document.getElementById("kPreview").style.display = "none";
+  document.getElementById("kImgName").textContent = "";
+  document.getElementById("btnKCancel").style.display = "none";
+};
+document.getElementById("btnKCancel").onclick = () => {
+  ["kId","kNom","kPrecio","kDir"].forEach(x => document.getElementById(x).value = "");
+  imgCancha = ""; document.getElementById("kImg").value = "";
+  document.getElementById("kPreview").style.display = "none";
+  document.getElementById("kImgName").textContent = "";
+  document.getElementById("btnKCancel").style.display = "none";
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro - Reservas Canchas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#f0fdf4;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:16px}
+.card{background:#fff;width:420px;max-width:100%;border-radius:20px;padding:28px 22px;box-shadow:0 8px 20px rgba(0,0,0,.15);text-align:center;border-top:6px solid #15803d}
+h2{color:#14532d}h3{color:#16a34a;font-size:13px;margin-bottom:16px}
+input,select{width:100%;padding:11px 14px;margin-bottom:10px;border-radius:25px;border:1px solid #15803d;outline:none;font-size:15px;background:#fff}
+button{width:100%;padding:12px;border-radius:25px;border:none;background:#15803d;color:#fff;font-weight:bold;font-size:16px;cursor:pointer}
+#msg{margin-top:10px;font-size:13px;min-height:18px;color:#b91c1c}
+a{font-size:13px;color:#15803d}
+</style>
+<script type="importmap">{ "imports": {
+"firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+"firebase/auth": "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js",
+"firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+} }</script>
+</head>
+<body>
+<div class="card">
+<h2>⚽ RESERVAS</h2><h3>REGISTRO DE ENCARGADO</h3>
+<input id="nom" placeholder="Nombre completo">
+<input id="email" type="email" placeholder="Correo">
+<input id="pass" type="password" placeholder="Contraseña (6+ caracteres)">
+<select id="rol"><option value="cliente">cliente</option><option value="encargado">encargado</option><option value="dueno">dueño</option><option value="admin">admin</option></select>
+<button id="btn">Solicitar cuenta</button>
+<div id="msg"></div>
+<p style="margin-top:10px"><a href="login.html">Ya tengo cuenta</a> · <a href="index.html">Ver canchas (sin cuenta)</a></p>
+</div>
+<script type="module">
+import { initializeApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { getFirestore, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { firebaseConfig } from "./firebase-config.js";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const msg = document.getElementById("msg");
+document.getElementById("btn").onclick = async () => {
+  const email = document.getElementById("email").value.trim();
+  const pass = document.getElementById("pass").value;
+  const NombreUsuario = document.getElementById("nom").value.trim();
+  const RolUsuario = document.getElementById("rol").value;
+  if (!email || pass.length < 6 || !NombreUsuario) { msg.textContent = "Completa nombre, correo y clave de 6+ caracteres"; return; }
+  msg.textContent = "Creando solicitud...";
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db, "Usuario", cred.user.uid), {
+      NombreUsuario, CorreoUsuario: email, RolUsuario, Estado: "pendiente", createdAt: serverTimestamp()
+    });
+    await signOut(auth);
+    msg.style.color = "green";
+    msg.textContent = "Solicitud enviada como " + RolUsuario + ". El dueño debe aprobarla.";
+  } catch(e) { msg.textContent = "Error: " + e.code + " " + e.message; }
+};
+</script>
+</body>
+</html>
